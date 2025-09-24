@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Xeno</title>
+    <style>
+      :root{
+	  --bg:#000;
+	  --fg:#fff;
+	  --panel:#111;
+	  --line:#888;
+	  --b:#333;
+      }
+      *{
+	  box-sizing:border-box;
+      }
+      html,body{
+	  height:100%;
+	  margin:0;
+      }
+      body{
+	  background:var(--bg);
+	  color:var(--fg);
+	  font:14px/1.4 sans-serif;
+	  display:flex;
+      }
+      .grid{
+	  display: grid;
+	  grid-template-columns:1fr 1fr;
+	  gap:6px;padding:6px;
+	  flex:1;
+	  overflow:hidden
+      }
+      section{
+	  display:flex;
+	  flex-direction:column;
+	  min-width:0;
+	  border:1px solid var(--line);
+	  background:var(--panel);
+	  padding:8px;
+      }
+      h2{
+	  margin:0 0 8px;
+      }
+      pre{
+	  margin: 0;
+      }
+      textarea,pre{
+	  flex:1;
+	  width:100%;
+	  background:#000;
+	  color:#fff;
+	  border:1px solid var(--b);
+	  padding:8px;
+	  overflow:auto;
+      }
+      textarea{
+	  resize:none;
+      }
+      .toolbar{
+	  margin-top:6px;
+	  flex-wrap:wrap;
+      }
+      @media(max-width:1160px){
+	  .grid{
+	      grid-template-columns:1fr;
+	  }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <section>
+	<h2>Input</h2>
+	<textarea id="src" spellcheck="false">code here</textarea>
+	<div class="toolbar">
+          <button id="loadExample">Load example</button>
+          <button id="run">Run</button>
+          <button id="parse">Parse</button>
+	</div>
+      </section>
+      <section>
+	<h2>Output</h2>
+	<pre id="out"></pre>
+      </section>
+    </div>
+    <script type="module">
+      import { startCubeFavicon } from './favicon.js'; 
+      import { init } from './Xeno.js';
+      init();
+      startCubeFavicon();
+    </script>
+  </body>
+</html>
