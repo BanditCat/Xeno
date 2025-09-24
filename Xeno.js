@@ -449,7 +449,7 @@ function topoSort(adj) {
     const remaining = nodes.filter(n => indeg.get(n) > 0);
     throw new SyntaxError(`cyclic definitions among: ${remaining.join(', ')}`);
   }
-  return order;
+  return order; 
 }
 
 // Expand global references by *copying in* already-built defs.
