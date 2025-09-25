@@ -20,9 +20,10 @@ export function init() {
     }
   };
   const loadExample = () => {
-    $('src').value = String.raw`cons = [\a d f.f [a d] id];
-id = [\a.a];
-out = [cons id id];`
+    $('src').value = String.raw`cons = [\a b f.f a b];
+true = [\a b.a];
+false = [\a b.b];
+out = [cons true false];`
   };
   $('run').addEventListener('click', run );
   $('loadExample').addEventListener('click', loadExample );
@@ -398,22 +399,6 @@ function liftFromDict(dict, entry = 'out') {
   return lift(ast);
 }
 
-// Optional: tiny dumper to verify shapes quickly
-function debugDump(packed, max = 20) {
-  const { A, B } = packed;
-  const n = Math.min(A.length, max);
-  let s = '';
-  for (let i = 0; i < n; i++) {
-    const tag = getTag(A[i], B[i]);
-    const a = getA(A[i]);
-    const b = getB(B[i]);
-    if (tag === TAG_APP) s += `${i}: APP  f=${a} arg=${b}\n`;
-    else if (tag === TAG_VAR) s += `${i}: VAR  parent=${a} lambda=${b}\n`;
-    else if (tag === TAG_LAM) s += `${i}: LAM  parent=${a} body=${b}\n`;
-    else s += `${i}: TAG${tag} A=${a} B=${b}\n`;
-  }
-  return s;
-}
 
 
 function depsFrom(ast, globals) {
@@ -526,4 +511,22 @@ function cloneAST(node) {
   case 'APP': 
     return { type:'APP', func: cloneAST(node.func), arg: cloneAST(node.arg), canon: node.canon };
   }
+}
+
+
+
+function debugDump(packed, max = 20) {
+  const { A, B } = packed;
+  const n = Math.min(A.length, max);
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    const tag = getTag(A[i], B[i]);
+    const a = getA(A[i]);
+    const b = getB(B[i]);
+    if (tag === TAG_APP) s += `${i}: APP  f=${a} arg=${b}\n`;
+    else if (tag === TAG_VAR) s += `${i}: VAR  parent=${a} lambda=${b}\n`;
+    else if (tag === TAG_LAM) s += `${i}: LAM  parent=${a} body=${b}\n`;
+    else s += `${i}: TAG${tag} A=${a} B=${b}\n`;
+  }
+  return s;
 }
