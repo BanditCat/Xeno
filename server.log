@@ -126,3 +126,81 @@ BrokenPipeError: [Errno 32] Broken pipe
 127.0.0.1 - - [26/Sep/2025 23:07:10] "GET /Xeno.js HTTP/1.1" 304 -
 127.0.0.1 - - [26/Sep/2025 23:15:05] "GET / HTTP/1.1" 200 -
 127.0.0.1 - - [26/Sep/2025 23:15:05] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:17:03] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:17:03] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:37:22] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:37:22] "GET /Xeno.js HTTP/1.1" 304 -
+127.0.0.1 - - [26/Sep/2025 23:37:22] code 404, message File not found
+127.0.0.1 - - [26/Sep/2025 23:37:22] "GET /favicon.ico HTTP/1.1" 404 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 37596)
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/http/server.py", line 731, in send_head
+    f = open(path, 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/root/code/Xeno/favicon.ico'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 1320, in finish_request
+    self.RequestHandlerClass(request, client_address, self,
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                             directory=args.directory)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 672, in __init__
+    super().__init__(*args, **kwargs)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 436, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 424, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 676, in do_GET
+    f = self.send_head()
+  File "/usr/lib/python3.13/http/server.py", line 733, in send_head
+    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 491, in send_error
+    self.wfile.write(body)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+127.0.0.1 - - [26/Sep/2025 23:42:22] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:42:22] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:45:35] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:45:35] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:13:03] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:16:09] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:16:09] "GET /Xeno.js HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:19:23] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:19:23] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:34:10] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:34:10] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:34:16] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:34:16] "GET /Xeno.js HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:38:45] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:38:45] "GET /Xeno.js HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:45:09] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:45:09] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:46:30] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:46:30] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:47:04] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:47:04] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:47:09] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:47:09] "GET /Xeno.js HTTP/1.1" 304 -
+127.0.0.1 - - [27/Sep/2025 00:47:34] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:47:34] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:48:53] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:48:53] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:49:09] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [27/Sep/2025 00:49:09] "GET /Xeno.js HTTP/1.1" 200 -
