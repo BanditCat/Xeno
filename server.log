@@ -19,3 +19,110 @@
 127.0.0.1 - - [26/Sep/2025 12:59:10] "GET /Xeno.js HTTP/1.1" 304 -
 127.0.0.1 - - [26/Sep/2025 12:59:14] "GET / HTTP/1.1" 304 -
 127.0.0.1 - - [26/Sep/2025 12:59:14] "GET /Xeno.js HTTP/1.1" 304 -
+127.0.0.1 - - [26/Sep/2025 14:05:34] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 14:05:34] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 14:05:34] code 404, message File not found
+127.0.0.1 - - [26/Sep/2025 14:05:34] "GET /favicon.ico HTTP/1.1" 404 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 55268)
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/http/server.py", line 731, in send_head
+    f = open(path, 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/root/code/Xeno/favicon.ico'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 1320, in finish_request
+    self.RequestHandlerClass(request, client_address, self,
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                             directory=args.directory)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 672, in __init__
+    super().__init__(*args, **kwargs)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 436, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 424, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 676, in do_GET
+    f = self.send_head()
+  File "/usr/lib/python3.13/http/server.py", line 733, in send_head
+    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 491, in send_error
+    self.wfile.write(body)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+127.0.0.1 - - [26/Sep/2025 22:38:44] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 22:38:44] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 22:38:44] "GET /favicon.js HTTP/1.1" 304 -
+127.0.0.1 - - [26/Sep/2025 22:41:34] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 22:41:34] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 22:54:57] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 22:54:57] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 22:54:57] code 404, message File not found
+127.0.0.1 - - [26/Sep/2025 22:54:57] "GET /favicon.ico HTTP/1.1" 404 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 45316)
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/http/server.py", line 731, in send_head
+    f = open(path, 'rb')
+FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/root/code/Xeno/favicon.ico'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 1320, in finish_request
+    self.RequestHandlerClass(request, client_address, self,
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                             directory=args.directory)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 672, in __init__
+    super().__init__(*args, **kwargs)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 436, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 424, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/usr/lib/python3.13/http/server.py", line 676, in do_GET
+    f = self.send_head()
+  File "/usr/lib/python3.13/http/server.py", line 733, in send_head
+    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/http/server.py", line 491, in send_error
+    self.wfile.write(body)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+127.0.0.1 - - [26/Sep/2025 23:00:51] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:00:51] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:04:57] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:04:57] "GET /Xeno.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:07:10] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:07:10] "GET /Xeno.js HTTP/1.1" 304 -
+127.0.0.1 - - [26/Sep/2025 23:15:05] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Sep/2025 23:15:05] "GET /Xeno.js HTTP/1.1" 200 -
