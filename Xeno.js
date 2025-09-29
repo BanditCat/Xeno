@@ -6,14 +6,35 @@ export function init() {
   const run = () => {
     try {
       $('out').style.color = ''; // reset color
-      st = parse($('src').value);
-      st.canonIdx = makeCanonIndex(st);
-      
-      $('out').textContent = showReconstructed(st);
+      const dict = parse($('src').value);
+      st   = liftToArrays(dict.get('out'));   // DAG with de-Bruijn VARs
+      const ast  = dropFromArrays(st);                         // pretty dict-AST (x0,x1,foo)
+
+      // You already have:
+      st.canonIdx = makeCanonIndex(dict);
+      $('out').textContent =
+        showReconstructed(dict) +
+        "\n\n-- reconstructed (debug view) --\n" +
+        ppAstWithDict(ast, st.canonIdx);
     } catch (e) {
       $('out').style.color = 'red';
       $('out').textContent = e.message;
     }
+    renderState(st);
+  };
+
+
+  
+  function renderState(st){
+  
+    $('out').textContent = ppAstWithDict(dropFromArrays(st), st.canonIdx);
+  }
+
+  const tfunc = () => {
+    if( !st )
+      run();
+    tick(st);
+    renderState(st);
   };
   const loadExample = () => {
     $('src').value = String.raw`// pairs & booleans
@@ -42,7 +63,7 @@ inc =
   ]]];
 
 // --- examples ---
-// six = 1102 (LSB-first: [0,1,1]) => inc -> 1112
+// six = 110 (LSB-first: [0,1,1]) => inc -> 1112
 six = [cons false [cons true [cons true false]]];
 out = [inc six];`
   };
@@ -50,18 +71,12 @@ out = [inc six];`
   $('loadExample').addEventListener('click', loadExample );
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey) && e.key === 'Enter') run();
+    if ((e.ctrlKey) && e.key === '.') tfunc();
   });
-  $('tick').addEventListener('click', () => {
-    if (!st) return;
-    const did = tick(st);
-    const astNow = drop(st);
-    const pretty = ppAstWithDict(astNow, st.canonIdx || makeCanonIndex(new Map()));
-    $('out').textContent =
-      pretty +
-      `\n\n(betaQ=${st.Q_beta.length}, copyQ=${st.Q_copy.length})` +
-      (did ? '' : '\n\n<done>');
-  });
+  $('tick').addEventListener('click', tfunc);
 }
+
+/* ============================== PARSER ============================== */
 
 function parse(input) {
   // ----- tokenize -----
@@ -125,7 +140,6 @@ function parse(input) {
     return tok;
   };
 
-  // Expr := Atom (Atom)*     ; left-assoc application
   function parseExpr() {
     let node = parseAtom();
     while (!atEnd() && (peek().t === 'ID' || peek().t === '[')) {
@@ -135,16 +149,12 @@ function parse(input) {
     return node;
   }
 
-  // Atom := ID | List
   function parseAtom() {
     const tok = peek();
     const where = tok ? `${tok.line}:${tok.col}` : "end of input";
     if (!tok) throw new SyntaxError(`expected atom at ${where}`);
 
-    if (tok.t === 'ID') {
-      k++;
-      return { type:'VAR', name: tok.v, line: tok.line, col: tok.col };
-    }
+    if (tok.t === 'ID') { k++; return { type:'VAR', name: tok.v, line: tok.line, col: tok.col }; }
     if (tok.t === '[') return parseList();
     throw new SyntaxError(`expected atom at ${where}`);
   }
@@ -173,7 +183,6 @@ function parse(input) {
   }
 
   const defs = [];
-
   while (!atEnd()) {
     const id = eat('ID');
     eat('=');
@@ -189,45 +198,36 @@ function parse(input) {
     }
     defs.push({ name: id.v, ast, line: id.line, col: id.col });
   }
-
   return buildDictTopo(defs, globals);
 }
 
-
 function getFreeVars(node, env = new Set()) {
   switch (node.type) {
-  case "VAR":
-    return env.has(node.name) ? new Set() : new Set([node.name]);
-
+  case "VAR": return env.has(node.name) ? new Set() : new Set([node.name]);
   case "LAM": {
     const env2 = new Set(env);
     env2.add(node.param);
     return getFreeVars(node.body, env2);
   }
-
   case "APP": {
     const left = getFreeVars(node.func, env);
     const right = getFreeVars(node.arg, env);
     for (const v of right) left.add(v);
     return left;
   }
-
-  default:
-    throw new TypeError("Unknown AST node type: " + node.type);
+  default: throw new TypeError("Unknown AST node type: " + node.type);
   }
 }
 
 function canonAlpha(node, env = {}, counter = {n:0}) {
   switch (node.type) {
-  case 'VAR':
-    return env[node.name];
+  case 'VAR': return env[node.name];
   case 'LAM': {
     const n = counter.n++;
     const env2 = {...env, [node.param]: n};
     return `L${n}${canonAlpha(node.body, env2, counter)}`;
   }
-  case 'APP':
-    return `A${canonAlpha(node.func, env, counter)}${canonAlpha(node.arg, env, counter)}`;
+  case 'APP': return `A${canonAlpha(node.func, env, counter)}${canonAlpha(node.arg, env, counter)}`;
   }
 }
 
@@ -248,14 +248,12 @@ function ppFromDict(node, canonIdx, top = false, wrapApps = true) {
   switch (node.type) {
   case 'VAR':
     return node.name;
-
   case 'LAM': {
     const params = [];
     let body = node;
     while (body.type === 'LAM') { params.push(body.param); body = body.body; }
     return `[\\${params.join(' ')}.${ppFromDict(body, canonIdx, false, false)}]`;
   }
-
   case 'APP': {
     const parts = [];
     let cur = node;
@@ -266,6 +264,9 @@ function ppFromDict(node, canonIdx, top = false, wrapApps = true) {
   }
   }
 }
+function ppAstWithDict(ast, canonIdx){
+  return ppFromDict(ast, canonIdx, /*top=*/true);
+}
 function showReconstructed(dict) {
   const canonIdx = makeCanonIndex(dict);
   let ret = "";
@@ -275,17 +276,13 @@ function showReconstructed(dict) {
   return ret;
 }
 
-
-
+/* =========================== TOPO / INLINE ========================= */
 
 function topoSort(adj) {
-  // Kahn
   const indeg = new Map();
   const nodes = Array.from(adj.keys());
   for (const n of nodes) indeg.set(n, 0);
-  for (const [n, nbrs] of adj) {
-    for (const m of nbrs) indeg.set(m, (indeg.get(m) ?? 0) + 1);
-  }
+  for (const [n, nbrs] of adj) for (const m of nbrs) indeg.set(m, (indeg.get(m) ?? 0) + 1);
   const q = [];
   for (const [n, d] of indeg) if (d === 0) q.push(n);
 
@@ -305,7 +302,6 @@ function topoSort(adj) {
   return order;
 }
 
-// Expand globals by copying built defs
 function inlineGlobals(node, built, bound = new Set()) {
   switch (node.type) {
   case 'VAR': {
@@ -320,8 +316,8 @@ function inlineGlobals(node, built, bound = new Set()) {
   }
   case 'APP':
     return { type:'APP',
-      func: inlineGlobals(node.func, built, bound),
-      arg:  inlineGlobals(node.arg,  built, bound) };
+             func: inlineGlobals(node.func, built, bound),
+             arg:  inlineGlobals(node.arg,  built, bound) };
   default:
     throw new Error('Unknown node.type in inlineGlobals: ' + node.type);
   }
@@ -361,18 +357,136 @@ function buildDictTopo(defs, globals) {
   }
   return final;
 }
+
 function cloneAST(node) {
   switch (node.type) {
-  case 'VAR':
-    return { type:'VAR', name: node.name, canon: node.canon };
-  case 'LAM':
-    return { type:'LAM', param: node.param, body: cloneAST(node.body), canon: node.canon };
-  case 'APP':
-    return { type:'APP', func: cloneAST(node.func), arg: cloneAST(node.arg), canon: node.canon };
+  case 'VAR': return { type:'VAR', name: node.name, canon: node.canon };
+  case 'LAM': return { type:'LAM', param: node.param, body: cloneAST(node.body), canon: node.canon };
+  case 'APP': return { type:'APP', func: cloneAST(node.func), arg: cloneAST(node.arg), canon: node.canon };
   }
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ====================== DAG packing helpers ======================= */
+const TAG_APP = 0, TAG_VAR = 1, TAG_LAM = 2;
+const NOIDX   = 0x3FFFFFFF >>> 0;          // 30-bit "none"
+const A_MASK  = 0x3FFFFFFF >>> 0;
+const B_MASK  = 0x3FFFFFFF >>> 0;
+
+function packWords(tag, aIdx, bIdx) {
+  const lo2 = (tag & 0b11) >>> 0;
+  const hi2 = ((tag >>> 2) & 0b11) >>> 0;
+  const A = ((lo2 << 30) >>> 0) | (aIdx & A_MASK);
+  const B = ((hi2 << 30) >>> 0) | (bIdx & B_MASK);
+  return [A >>> 0, B >>> 0];
+}
+function getTag(A, B) { return (((B >>> 30) << 2) | (A >>> 30)) >>> 0; }
+function getA(A)      { return (A & A_MASK) >>> 0; }
+function getB(B)      { return (B & B_MASK) >>> 0; }
+
+/* ============================ LIFT ================================ */
+/** Lift a dict-AST (already inlined, no free globals) to a hash-consed DAG. 
+ *  Returns { A, B, rootIdx } where:
+ *   - APP: A=func, B=arg
+ *   - LAM: A=body, B=NOIDX
+ *   - VAR: A=NOIDX, B=deBruijnIndex (0 = nearest binder)
+ */
+export function liftToArrays(rootAst) {
+  const A = [], B = [];
+  const cons = new Map(); // "tag|a|b" -> id
+
+  function mk(tag, a, b) {
+    const key = `${tag}|${a}|${b}`;
+    let id = cons.get(key);
+    if (id !== undefined) return id;
+    id = A.length;
+    const [wa, wb] = packWords(tag, a >>> 0, b >>> 0);
+    A.push(wa); B.push(wb);
+    cons.set(key, id);
+    return id;
+  }
+
+  // bound stack: [innermost, ..., outermost] of param names
+  function go(node, bound) {
+    switch (node.type) {
+    case 'VAR': {
+      const k = bound.indexOf(node.name);
+      if (k < 0) throw new Error(`free variable '${node.name}' in lift`);
+      return mk(TAG_VAR, NOIDX, k >>> 0);
+    }
+    case 'LAM': {
+      // push new binder at the *front* so VAR 0 refers to it
+      const bodyId = go(node.body, [node.param, ...bound]);
+      return mk(TAG_LAM, bodyId >>> 0, NOIDX);
+    }
+    case 'APP': {
+      const f = go(node.func, bound);
+      const a = go(node.arg,  bound);
+      return mk(TAG_APP, f >>> 0, a >>> 0);
+    }
+    default:
+      throw new TypeError(`lift: unknown node.type ${node.type}`);
+    }
+  }
+
+  const rootIdx = go(rootAst, []);
+  return { A, B, rootIdx };
+}
+
+/* ============================= DROP =============================== */
+/** Reconstruct a dict-AST (pretty, with synthetic names x0,x1,foo) from DAG. */
+export function dropFromArrays(st) {
+  const { A, B, rootIdx } = st;
+
+  // Build a tree for pretty printing; we don't attempt to preserve DAG sharing
+  function go(id, bound) {
+    const tag = getTag(A[id], B[id]);
+    if (tag === TAG_VAR) {
+      const k = getB(B[id]) | 0; // 0..N
+      const name = bound[k];
+      if (name === undefined) throw new Error(`drop: VAR ${k} out of scope at node ${id}`);
+      return { type: 'VAR', name };
+    }
+    if (tag === TAG_LAM) {
+      const bodyId = getA(A[id]) | 0;
+      // synthesize a fresh param name; innermost is at index 0
+      const param = `x${bound.length}`;
+      const body  = go(bodyId, [param, ...bound]);
+      return { type: 'LAM', param, body };
+    }
+    if (tag === TAG_APP) {
+      const f = go(getA(A[id]) | 0, bound);
+      const a = go(getB(B[id]) | 0, bound);
+      return { type: 'APP', func: f, arg: a };
+    }
+    throw new Error(`drop: unknown tag ${tag} at node ${id}`);
+  }
+
+  return go(rootIdx, []);
+}
 
 
 
