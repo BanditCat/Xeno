@@ -7,15 +7,10 @@ export function init() {
     try {
       $('out').style.color = ''; // reset color
       const dict = parse($('src').value);
-      st   = liftToArrays(dict.get('out'));   // DAG with de-Bruijn VARs
-      const ast  = dropFromArrays(st);                         // pretty dict-AST (x0,x1,foo)
-
-      // You already have:
+      st = dict;
       st.canonIdx = makeCanonIndex(dict);
       $('out').textContent =
-        showReconstructed(dict) +
-        "\n\n-- reconstructed (debug view) --\n" +
-        ppAstWithDict(ast, st.canonIdx);
+        showReconstructed(dict);
     } catch (e) {
       $('out').style.color = 'red';
       $('out').textContent = e.message;
@@ -25,15 +20,21 @@ export function init() {
 
 
   
-  function renderState(st){
   
-    $('out').textContent = ppAstWithDict(dropFromArrays(st), st.canonIdx);
+  function renderState(st){
+    $('out').textContent = ppAstWithDict(st.get('out'), st.canonIdx);
   }
 
   const tfunc = () => {
     if( !st )
       run();
     tick(st);
+    renderState(st);
+  };
+  const tfuncNF = () => {
+    if( !st )
+      run();
+    tickNF(st);
     renderState(st);
   };
   const loadExample = () => {
@@ -47,7 +48,7 @@ head = [\p.p [\a b.a]];
 tail = [\p.p [\a b.b]];
 
 // empty?  (nil -> true, cons -> false)
-isnil = [\x.x [\a b.false] true];
+isnil = [\x. x [\a b. [\z. false]]  true];
 
 // fixpoint (normal-order Y)
 Y = [\f.[ [\x.f [x x]] [\x.f [x x]] ]];
@@ -71,9 +72,11 @@ out = [inc six];`
   $('loadExample').addEventListener('click', loadExample );
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey) && e.key === 'Enter') run();
-    if ((e.ctrlKey) && e.key === '.') tfunc();
+    if ((e.ctrlKey) && e.key === ',') tfunc();
+    if ((e.ctrlKey) && e.key === '.') tfuncNF();
   });
   $('tick').addEventListener('click', tfunc);
+  $('tickNF').addEventListener('click', tfuncNF);
 }
 
 /* ============================== PARSER ============================== */
@@ -371,122 +374,155 @@ function cloneAST(node) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* ====================== DAG packing helpers ======================= */
-const TAG_APP = 0, TAG_VAR = 1, TAG_LAM = 2;
-const NOIDX   = 0x3FFFFFFF >>> 0;          // 30-bit "none"
-const A_MASK  = 0x3FFFFFFF >>> 0;
-const B_MASK  = 0x3FFFFFFF >>> 0;
-
-function packWords(tag, aIdx, bIdx) {
-  const lo2 = (tag & 0b11) >>> 0;
-  const hi2 = ((tag >>> 2) & 0b11) >>> 0;
-  const A = ((lo2 << 30) >>> 0) | (aIdx & A_MASK);
-  const B = ((hi2 << 30) >>> 0) | (bIdx & B_MASK);
-  return [A >>> 0, B >>> 0];
-}
-function getTag(A, B) { return (((B >>> 30) << 2) | (A >>> 30)) >>> 0; }
-function getA(A)      { return (A & A_MASK) >>> 0; }
-function getB(B)      { return (B & B_MASK) >>> 0; }
-
-/* ============================ LIFT ================================ */
-/** Lift a dict-AST (already inlined, no free globals) to a hash-consed DAG. 
- *  Returns { A, B, rootIdx } where:
- *   - APP: A=func, B=arg
- *   - LAM: A=body, B=NOIDX
- *   - VAR: A=NOIDX, B=deBruijnIndex (0 = nearest binder)
- */
-export function liftToArrays(rootAst) {
-  const A = [], B = [];
-  const cons = new Map(); // "tag|a|b" -> id
-
-  function mk(tag, a, b) {
-    const key = `${tag}|${a}|${b}`;
-    let id = cons.get(key);
-    if (id !== undefined) return id;
-    id = A.length;
-    const [wa, wb] = packWords(tag, a >>> 0, b >>> 0);
-    A.push(wa); B.push(wb);
-    cons.set(key, id);
-    return id;
-  }
-
-  // bound stack: [innermost, ..., outermost] of param names
-  function go(node, bound) {
-    switch (node.type) {
-    case 'VAR': {
-      const k = bound.indexOf(node.name);
-      if (k < 0) throw new Error(`free variable '${node.name}' in lift`);
-      return mk(TAG_VAR, NOIDX, k >>> 0);
-    }
-    case 'LAM': {
-      // push new binder at the *front* so VAR 0 refers to it
-      const bodyId = go(node.body, [node.param, ...bound]);
-      return mk(TAG_LAM, bodyId >>> 0, NOIDX);
-    }
-    case 'APP': {
-      const f = go(node.func, bound);
-      const a = go(node.arg,  bound);
-      return mk(TAG_APP, f >>> 0, a >>> 0);
-    }
-    default:
-      throw new TypeError(`lift: unknown node.type ${node.type}`);
-    }
-  }
-
-  const rootIdx = go(rootAst, []);
-  return { A, B, rootIdx };
+function tick(st){
+  const t = st.get('out');
+  const r = step(t);
+  if (r) st.set('out', r);
+  return !!r;
 }
 
-/* ============================= DROP =============================== */
-/** Reconstruct a dict-AST (pretty, with synthetic names x0,x1,foo) from DAG. */
-export function dropFromArrays(st) {
-  const { A, B, rootIdx } = st;
+// Leftmost-outermost (normal order). Do not reduce under lambdas.
+function step(t){
+  if (t.type === 'APP'){
+    const f = t.func;
+    if (f.type === 'LAM') return beta(f.param, f.body, t.arg); // (?x.M) N  ?  M[x:=N]
+    const f2 = step(f);
+    if (f2) return { type:'APP', func:f2, arg:t.arg };
+    return null; // don't touch the argument (normal order)
+  }
+  return null; // VAR or LAM: no step
+}
 
-  // Build a tree for pretty printing; we don't attempt to preserve DAG sharing
-  function go(id, bound) {
-    const tag = getTag(A[id], B[id]);
-    if (tag === TAG_VAR) {
-      const k = getB(B[id]) | 0; // 0..N
-      const name = bound[k];
-      if (name === undefined) throw new Error(`drop: VAR ${k} out of scope at node ${id}`);
-      return { type: 'VAR', name };
+// B (capture-avoiding): substitute v for free x in m.
+function beta(x, m, v){
+  return subst(m, x, v);
+}
+
+// Capture-avoiding substitution M[x:=V]
+function subst(m, x, v){
+  switch(m.type){
+  case 'VAR':
+    return (m.name === x) ? clone(v) : m;
+
+  case 'APP':
+    return { type:'APP',
+             func: subst(m.func, x, v),
+             arg:  subst(m.arg,  x, v) };
+
+  case 'LAM': {
+    if (m.param === x) return m; // x is bound here; stop
+    const fvV = freeVars(v);
+    if (fvV.has(m.param)) {
+      // avoid capture: a-rename binder first
+      const freshName = fresh(m.param, unionSets(fvV, allNames(m.body), new Set([x])));
+      const bodyRenamed = alphaRenameBound(m.body, m.param, freshName);
+      return { type:'LAM',
+               param: freshName,
+               body:  subst(bodyRenamed, x, v) };
+    } else {
+      return { type:'LAM', param: m.param, body: subst(m.body, x, v) };
     }
-    if (tag === TAG_LAM) {
-      const bodyId = getA(A[id]) | 0;
-      // synthesize a fresh param name; innermost is at index 0
-      const param = `x${bound.length}`;
-      const body  = go(bodyId, [param, ...bound]);
-      return { type: 'LAM', param, body };
+  }
+  }
+}
+
+// --- helpers ---
+
+function clone(t){
+  switch(t.type){
+  case 'VAR': return { type:'VAR', name:t.name };
+  case 'LAM': return { type:'LAM', param:t.param, body: clone(t.body) };
+  case 'APP': return { type:'APP', func: clone(t.func), arg: clone(t.arg) };
+  }
+}
+
+function freeVars(t, bound = new Set()){
+  switch(t.type){
+  case 'VAR': return bound.has(t.name) ? new Set() : new Set([t.name]);
+  case 'LAM': { const b = new Set(bound); b.add(t.param); return freeVars(t.body, b); }
+  case 'APP': {
+    const L = freeVars(t.func, bound), R = freeVars(t.arg, bound);
+    for (const x of R) L.add(x); return L;
+  }
+  }
+}
+
+function allNames(t){
+  const s = new Set();
+  (function go(n){
+    if (!n) return;
+    if (n.type === 'VAR') s.add(n.name);
+    else if (n.type === 'LAM'){ s.add(n.param); go(n.body); }
+    else if (n.type === 'APP'){ go(n.func); go(n.arg); }
+  })(t);
+  return s;
+}
+
+function unionSets(...sets){
+  const u = new Set();
+  for (const S of sets) for (const x of S) u.add(x);
+  return u;
+}
+
+function fresh(base, avoid){
+  let i = 0, name = base;
+  while (avoid.has(name)) name = base + (++i);
+  return name;
+}
+
+// a-rename exactly the occurrences bound by the *nearest* binder named oldName
+function alphaRenameBound(t, oldName, newName, shadow = 0){
+  switch(t.type){
+  case 'VAR':
+    return (shadow === 0 && t.name === oldName)
+      ? { type:'VAR', name:newName }
+    : t;
+
+  case 'LAM': {
+    if (t.param === oldName){
+      // inner binder shadows the one we're renaming; increase shadow depth
+      return { type:'LAM', param: oldName,
+               body: alphaRenameBound(t.body, oldName, newName, shadow+1) };
     }
-    if (tag === TAG_APP) {
-      const f = go(getA(A[id]) | 0, bound);
-      const a = go(getB(B[id]) | 0, bound);
-      return { type: 'APP', func: f, arg: a };
+    if (shadow === 0){
+      // still under the binder we renamed; keep walking
+      return { type:'LAM', param: t.param,
+               body: alphaRenameBound(t.body, oldName, newName, shadow) };
+    } else {
+      // under a shadowing binder; do not rename inside
+      return { type:'LAM', param: t.param, body: t.body };
     }
-    throw new Error(`drop: unknown tag ${tag} at node ${id}`);
   }
 
-  return go(rootIdx, []);
+  case 'APP':
+    return { type:'APP',
+             func: alphaRenameBound(t.func, oldName, newName, shadow),
+             arg:  alphaRenameBound(t.arg,  oldName, newName, shadow) };
+  }
+}
+
+
+function stepNF(t){
+  if (t.type === 'APP'){
+    if (t.func.type === 'LAM') return beta(t.func.param, t.func.body, t.arg);
+    const f2 = stepNF(t.func); if (f2) return { type:'APP', func:f2, arg:t.arg };
+    const a2 = stepNF(t.arg);  if (a2) return { type:'APP', func:t.func, arg:a2 };
+    return null;
+  }
+  if (t.type === 'LAM'){
+    const b2 = stepNF(t.body); if (b2) return { type:'LAM', param:t.param, body:b2 };
+    return null;
+  }
+  return null; // VAR
 }
 
 
 
+
+
+function tickNF(st){
+  const t = st.get('out');
+  const r = stepNF(t);
+  if (r) st.set('out', r);
+  return !!r;
+}

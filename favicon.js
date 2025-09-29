@@ -164,6 +164,7 @@ export function startCubeFavicon() {
     t = 0; drawFrame(); return;
   }
   stopCubeFavicon();
+  alert('foo');
   const step = (ts) => {
     if (!raf) return;
     t += 0.3;           // phase increment; small for subtle motion
