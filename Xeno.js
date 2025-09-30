@@ -2,12 +2,13 @@ const $ = (id) => (document.getElementById(id));
 
 export function init() {
   let st = null;
+  let dict = null;
   const dump = () => { if (st) console.log(debugDump(st)); };
   const run = () => {
     try {
       $('out').style.color = ''; // reset color
-      const dict = parse($('src').value);
-      st = dict;
+      dict = parse($('src').value);
+      st = lift(dict.get('out'));
       st.canonIdx = makeCanonIndex(dict);
       $('out').textContent =
         showReconstructed(dict);
@@ -15,30 +16,35 @@ export function init() {
       $('out').style.color = 'red';
       $('out').textContent = e.message;
     }
-    renderState(st);
+    renderState();
   };
 
 
   
   
-  function renderState(st){
-    $('out').textContent = ppAstWithDict(st.get('out'), st.canonIdx);
+  function renderState(){
+    if(st)
+      $('out').textContent = printDag(st);
+    else
+      $('out').textContent = showReconstructed(dict);
   }
 
   const tfunc = () => {
     if( !st )
       run();
-    tick(st);
-    renderState(st);
+    tickDAG(st);
+    renderState();
   };
   const tfuncNF = () => {
     if( !st )
       run();
-    tickNF(st);
-    renderState(st);
+    tickNF(dict);
+    renderState();
   };
   const loadExample = () => {
-    $('src').value = String.raw`// pairs & booleans
+    $('src').value = String.raw`id = [\a.a]
+
+// pairs & booleans
 cons  = [\a b f.f a b];
 true  = [\a b.a];
 false = [\a b.b];
@@ -525,4 +531,298 @@ function tickNF(st){
   const r = stepNF(t);
   if (r) st.set('out', r);
   return !!r;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ======================= DAG core ======================= */
+const TAG_APP = 0, TAG_VAR = 1, TAG_LAM = 2;
+function tagLabel(t){ return t===TAG_APP ? 'APP' : t===TAG_VAR ? 'VAR' : t===TAG_LAM ? 'LAM' : `???(${t})`; }
+const NOIDX   = 0x3FFFFFFF >>> 0;          // 30-bit "none"
+const A_MASK  = 0x3FFFFFFF >>> 0;
+const B_MASK  = 0x3FFFFFFF >>> 0;
+
+function packWords(tag, aIdx, bIdx){
+  const lo2 = (tag & 0b11) >>> 0;
+  const hi2 = ((tag >>> 2) & 0b11) >>> 0;
+  const A = ((lo2 << 30) >>> 0) | (aIdx & A_MASK);
+  const B = ((hi2 << 30) >>> 0) | (bIdx & B_MASK);
+  return [A >>> 0, B >>> 0];
+}
+function getTag(A, B){ return (((B >>> 30) << 2) | (A >>> 30)) >>> 0; }
+function getA(A){ return (A & A_MASK) >>> 0; }
+function getB(B){ return (B & B_MASK) >>> 0; }
+
+const keyAB = (A,B) => (BigInt(A) << 32n) | BigInt(B);
+
+/** Hash-consed constructor: returns existing id if present, else allocates. */
+function mk(st, tag, a, b){
+  const [Aw, Bw] = packWords(tag, a >>> 0, b >>> 0);
+  const k = keyAB(Aw, Bw);
+  const hit = st.cons.get(k);
+  if (hit !== undefined) return hit;
+  const id = st.A.length;
+  st.A.push(Aw); st.B.push(Bw);
+  st.cons.set(k, id);
+  return id;
+}
+
+/* =================== LIFT: AST -> DAG (DB) =================== */
+/** Named AST -> DAG with de Bruijn indices. Produces st = {A,B,rootIdx,cons}. */
+function lift(ast){
+  const st = { A: [], B: [], rootIdx: 0, cons: new Map(), fwd: [] };
+
+  function go(node, env /* array of binder names, [innermost,...] */){
+    switch(node.type){
+    case 'VAR': {
+      const k = env.indexOf(node.name);
+      if (k < 0) throw new Error("lift: free variable " + node.name);
+      return mk(st, TAG_VAR, NOIDX, k >>> 0);
+    }
+    case 'LAM': {
+      const body = go(node.body, [node.param, ...env]);
+      return mk(st, TAG_LAM, body, NOIDX);
+    }
+    case 'APP': {
+      const f = go(node.func, env);
+      const a = go(node.arg,  env);
+      return mk(st, TAG_APP, f, a);
+    }
+    default:
+      throw new Error("lift: unknown node.type " + node.type);
+    }
+  }
+
+  st.rootIdx = go(ast, []);
+  return st;
+}
+function find(st, i){
+  let j = i;
+  while (st.fwd[j] !== undefined) j = st.fwd[j];
+  // path compression
+  while (i !== j) { const n = st.fwd[i]; st.fwd[i] = j; i = n; }
+  return j;
+}
+function redirect(st, from, to){
+  from = find(st, from);
+  to   = find(st, to);
+  if (from === to) return false;   // <- no-op
+  st.fwd[from] = to;
+  return true;
+}
+
+// Always canonicalize children before hash-consing:
+function mkF(st, tag, a, b){
+  a = find(st, a); b = find(st, b);
+  return mk(st, tag, a, b); // your mk() from the code
+}
+// tiny ctors
+const mkVAR = (st,k)     => mkF(st, TAG_VAR, NOIDX, k>>>0);
+const mkLAM = (st,body)  => mkF(st, TAG_LAM, body, NOIDX);
+const mkAPP = (st,f,a)   => mkF(st, TAG_APP, f, a);
+
+// Safe accessors (always through find)
+function tagOf(st, i){ i = find(st, i); return getTag(st.A[i], st.B[i]); }
+function aOf  (st, i){ i = find(st, i); return getA  (st.A[i]); }
+function bOf  (st, i){ i = find(st, i); return getB  (st.B[i]); }
+
+
+
+
+function printDag(st){
+  const out = [];
+  for (let i = 0; i < st.A.length; i++) {
+    const A = st.A[i], B = st.B[i];
+    const t = getTag(A, B), a = getA(A), b = getB(B);
+    let line = `${i}: ${tagLabel(t)} `;
+    if (t === TAG_APP)      line += `f=${a} a=${b}`;
+    else if (t === TAG_LAM) line += `body=${a}`;
+    else if (t === TAG_VAR) line += `k=${b}`;
+    else                    line += `a=${a} b=${b}`;
+    if (st.fwd[i] !== undefined) line += `  fwd=${st.fwd[i]}`;
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+
+
+
+
+
+/* =================== DAG REDUCTION =================== */
+
+/**
+ * Single step of normal-order reduction on the DAG.
+ * Finds leftmost-outermost redex and performs in-place beta reduction.
+ * Returns true if a step was taken, false if in normal form.
+ */
+function tickDAG(st) {
+  st.rootIdx = find(st, st.rootIdx);
+  const result = stepDAG(st, st.rootIdx);
+  if (result !== null) {
+    redirect(st, st.rootIdx, result);
+    st.rootIdx = result;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Normal-order step: leftmost-outermost, no reduction under lambdas.
+ * Returns new node index if step taken, null otherwise.
+ */
+function stepDAG(st, idx) {
+  idx = find(st, idx);
+  const tag = tagOf(st, idx);
+  
+  if (tag === TAG_APP) {
+    const funcIdx = aOf(st, idx);
+    const argIdx = bOf(st, idx);
+    const funcTag = tagOf(st, funcIdx);
+    
+    // Beta redex: (?.body) arg
+    if (funcTag === TAG_LAM) {
+      const bodyIdx = aOf(st, funcIdx);
+      return betaDAG(st, bodyIdx, argIdx);
+    }
+    
+    // Try to reduce function position
+    const funcReduced = stepDAG(st, funcIdx);
+    if (funcReduced !== null) {
+      return mkAPP(st, funcReduced, argIdx);
+    }
+    
+    // Normal order: don't reduce argument
+    return null;
+  }
+  
+  // VAR or LAM: no reduction
+  return null;
+}
+
+/**
+ * Beta reduction: substitute arg for de Bruijn index 0 in body.
+ * body uses indices [0,1,2,...] where 0 is the bound variable.
+ * After substitution, all free indices must be decremented.
+ */
+function betaDAG(st, bodyIdx, argIdx) {
+  return substDAG(st, bodyIdx, 0, argIdx, 0);
+}
+
+/**
+ * Capture-avoiding substitution in DAG with de Bruijn indices.
+ * 
+ * @param {Object} st - The DAG state
+ * @param {number} termIdx - The term to substitute into
+ * @param {number} target - The de Bruijn level to replace (relative to depth)
+ * @param {number} valueIdx - The value to substitute
+ * @param {number} depth - Current binding depth (how many ?s deep we are)
+ * @returns {number} New node index after substitution
+ */
+function substDAG(st, termIdx, target, valueIdx, depth) {
+  termIdx = find(st, termIdx);
+  const tag = tagOf(st, termIdx);
+  
+  if (tag === TAG_VAR) {
+    const k = bOf(st, termIdx);
+    
+    if (k === target + depth) {
+      // This is the variable we're substituting
+      // Shift the value up by 'depth' to account for the lambdas we're under
+      return shiftDAG(st, valueIdx, depth, 0);
+    } else if (k > target + depth) {
+      // Free variable that needs to be decremented (since we're removing a binder)
+      return mkVAR(st, k - 1);
+    } else {
+      // Variable bound by a lambda we're inside - unchanged
+      return termIdx;
+    }
+  }
+  
+  if (tag === TAG_LAM) {
+    const bodyIdx = aOf(st, termIdx);
+    // Under a lambda, increment depth
+    const newBody = substDAG(st, bodyIdx, target, valueIdx, depth + 1);
+    return mkLAM(st, newBody);
+  }
+  
+  if (tag === TAG_APP) {
+    const funcIdx = aOf(st, termIdx);
+    const argIdx = bOf(st, termIdx);
+    const newFunc = substDAG(st, funcIdx, target, valueIdx, depth);
+    const newArg = substDAG(st, argIdx, target, valueIdx, depth);
+    return mkAPP(st, newFunc, newArg);
+  }
+  
+  return termIdx;
+}
+
+/**
+ * Shift de Bruijn indices in a term.
+ * Adds 'amount' to all indices >= cutoff.
+ * Used when moving a term under additional lambda binders.
+ * 
+ * @param {Object} st - The DAG state
+ * @param {number} termIdx - The term to shift
+ * @param {number} amount - How much to shift by
+ * @param {number} cutoff - Only shift indices >= this value
+ * @returns {number} New node index with shifted indices
+ */
+function shiftDAG(st, termIdx, amount, cutoff) {
+  if (amount === 0) return termIdx;
+  
+  termIdx = find(st, termIdx);
+  const tag = tagOf(st, termIdx);
+  
+  if (tag === TAG_VAR) {
+    const k = bOf(st, termIdx);
+    if (k >= cutoff) {
+      return mkVAR(st, k + amount);
+    }
+    return termIdx;
+  }
+  
+  if (tag === TAG_LAM) {
+    const bodyIdx = aOf(st, termIdx);
+    // Under a lambda, increment the cutoff
+    const newBody = shiftDAG(st, bodyIdx, amount, cutoff + 1);
+    return mkLAM(st, newBody);
+  }
+  
+  if (tag === TAG_APP) {
+    const funcIdx = aOf(st, termIdx);
+    const argIdx = bOf(st, termIdx);
+    const newFunc = shiftDAG(st, funcIdx, amount, cutoff);
+    const newArg = shiftDAG(st, argIdx, amount, cutoff);
+    return mkAPP(st, newFunc, newArg);
+  }
+  
+  return termIdx;
+}
+
+function debugDump(st) {
+  return printDag(st) + `\nroot=${st.rootIdx} (canon: ${find(st, st.rootIdx)})`;
 }
